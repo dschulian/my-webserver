@@ -1,7 +1,13 @@
 AWSTemplateFormatVersion: "2010-09-09"  
-Description: Create an EC2 instance, attach a volume, run a webserver to host some content.
-Resources:
+Description: Create an EC2 instance in your us-west-1 Default-VPC and Default-Subnet, attach a volume, run a webserver to host some content.
 
+Parameters:
+  KeyPairName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+Resources:
   ## Security group for WebInstance enabling port 80
   ## from all IP addresses
   WebSecurityGroup:
@@ -9,7 +15,6 @@ Resources:
     Properties:
       GroupDescription: Web server
       GroupName: web
-      VpcId: vpc-2ff17a4a
       SecurityGroupIngress:
         -
           IpProtocol: tcp
@@ -23,14 +28,16 @@ Resources:
           CidrIp: 0.0.0.0/0
 
   ## EC2 Instance with a custom security group
-  ## and a larger root instance device
-  ## and an externally created EBS volume attached
+  ## with an Amazon Linux 2 AMI in us-west-1 region
+  ## and an externally created EBS volume with website content attached
+  ## Userdata to install docker and host website content data via a nginx webserver
   WebInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: ami-015954d5e5548d13b
-      KeyName: my-key
+      KeyName: !Ref KeyPairName
       InstanceType: t2.small
+      AvailabilityZone: us-west-1a
       SecurityGroupIds:
         - !Ref WebSecurityGroup
       BlockDeviceMappings:
@@ -39,7 +46,6 @@ Resources:
           Ebs:
             VolumeSize: 8
             VolumeType: gp2
-      SubnetId: subnet-c8318d91
       Tags:
         -
           Key: Name
@@ -59,15 +65,15 @@ Resources:
           usermod -a -G docker ec2-user
           mkdir /data
           mount /dev/xvdf1 /data
-          git clone https://github.com/dschulian/my-webserver.git
-          cp -r /data/html my-webserver/
-          chown -R ec2-user:ec2-user my-webserver/
-          chmod -R +rw my-webserver/html
+          git clone https://github.com/dschulian/my-webserver.git /home/ec2-user/my-webserver
+          cp -r /data/html /home/ec2-user/my-webserver/
+          chown -R ec2-user:ec2-user /home/ec2-user/my-webserver/
+          chmod -R +rw /home/ec2-user/my-webserver/html
           umount /data
-          docker build -t my-webserver my-webserver/
+          docker build -t my-webserver /home/ec2-user/my-webserver/
           docker run -dit --restart unless-stopped -p 80:80 my-webserver
 
-  ## EBS Volume for storing web logs
+  ## EBS Volume from a snapshot with website content data
   WebContent:
     Type: AWS::EC2::Volume
     Properties:
@@ -79,3 +85,12 @@ Resources:
           Key: Name
           Value: webserver-content
       VolumeType: gp2
+  
+Outputs:
+  PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value: !GetAtt WebInstance.PublicIp
+
+  PublicDNS: 
+    Description: Public DNSName of the newly created EC2 instance
+    Value: !GetAtt WebInstance.PublicDnsName
