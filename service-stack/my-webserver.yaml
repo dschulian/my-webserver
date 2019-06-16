@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"  
-Description: Create an EC2 instance in your us-west-1 Default-VPC and Default-Subnet, attach a volume, run a webserver to host some content.
+Description: Create an EC2 instance in your us-west-1 Default-VPC and Default-Subnet, attach a volume, run a webserver to host some content. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template.
 
 Parameters:
   KeyPairName:
